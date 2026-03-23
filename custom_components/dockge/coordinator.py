@@ -119,7 +119,7 @@ class DockgeCoordinator(DataUpdateCoordinator):
             "last_update": last_update,
         }
 
-    async def api_call(self, method: str, path: str, json: dict | None = None) -> dict | list | None:
+    async def api_call(self, method: str, path: str, json: dict | None = None, timeout: int = 30) -> dict | list | None:
         """Make an API call to Dockge (for actions like update, toggle)."""
         try:
             async with aiohttp.ClientSession() as session:
@@ -128,7 +128,7 @@ class DockgeCoordinator(DataUpdateCoordinator):
                     f"{self.url}{path}",
                     headers=self._headers(),
                     json=json,
-                    timeout=aiohttp.ClientTimeout(total=30),
+                    timeout=aiohttp.ClientTimeout(total=timeout),
                 ) as resp:
                     resp.raise_for_status()
                     try:

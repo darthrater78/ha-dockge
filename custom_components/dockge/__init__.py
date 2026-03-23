@@ -55,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator.mark_busy(endpoint, stack_name)
         await asyncio.sleep(0.1)  # Let event loop propagate busy state to frontend
         try:
-            await coordinator.api_call("POST", f"/api/stacks/{stack_name}/{action_path}{endpoint_param}")
+            await coordinator.api_call("POST", f"/api/stacks/{stack_name}/{action_path}{endpoint_param}", timeout=300)
         finally:
             coordinator.mark_done(endpoint, stack_name)
             await coordinator.async_request_refresh()
