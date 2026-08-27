@@ -51,6 +51,18 @@ async def async_setup_entry(
                 new_entities.append(
                     DockgeCheckUpdatesButton(coordinator, entry, stack, aname, multi_agent=is_multi)
                 )
+                new_entities.append(
+                    DockgeStartStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
+                )
+                new_entities.append(
+                    DockgeStopStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
+                )
+                new_entities.append(
+                    DockgeRestartStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
+                )
+                new_entities.append(
+                    DockgeDownStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
+                )
         if new_entities:
             async_add_entities(new_entities)
 
@@ -63,6 +75,10 @@ async def async_setup_entry(
         aname = agent_display_name(agent_names, ep)
         entities.append(DockgeUpdateStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
         entities.append(DockgeCheckUpdatesButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
+        entities.append(DockgeStartStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
+        entities.append(DockgeStopStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
+        entities.append(DockgeRestartStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
+        entities.append(DockgeDownStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
 
     async_add_entities(entities)
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_entities))
@@ -128,6 +144,138 @@ class DockgeCheckUpdatesButton(CoordinatorEntity, ButtonEntity):
         try:
             await self.coordinator.api_call(
                 "POST", f"/api/stacks/{self._stack_name}/check-updates{endpoint_param}"
+            )
+        finally:
+            self.coordinator.mark_done(self._endpoint, self._stack_name)
+            await self.coordinator.async_request_refresh()
+
+
+class DockgeStartStackButton(CoordinatorEntity, ButtonEntity):
+    """Button to start a stack."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:play"
+
+    def __init__(
+        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
+        stack: dict, agent_name: str, *, multi_agent: bool = False,
+    ) -> None:
+        super().__init__(coordinator)
+        self._stack_name = stack["name"]
+        self._endpoint = stack.get("endpoint", "")
+        self._attr_unique_id = f"{entry.entry_id}_start_{self._endpoint}_{self._stack_name}"
+        self._attr_name = "Start"
+        self._attr_device_info = stack_device_info(
+            entry.entry_id, self._endpoint, self._stack_name, agent_name,
+            multi_agent=multi_agent,
+        )
+
+    async def async_press(self) -> None:
+        endpoint_param = f"?endpoint={self._endpoint}" if self._endpoint else ""
+        self.coordinator.mark_busy(self._endpoint, self._stack_name)
+        await asyncio.sleep(0.1)
+        try:
+            await self.coordinator.api_call(
+                "POST", f"/api/stacks/{self._stack_name}/start{endpoint_param}"
+            )
+        finally:
+            self.coordinator.mark_done(self._endpoint, self._stack_name)
+            await self.coordinator.async_request_refresh()
+
+
+class DockgeStopStackButton(CoordinatorEntity, ButtonEntity):
+    """Button to stop a stack."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:stop"
+
+    def __init__(
+        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
+        stack: dict, agent_name: str, *, multi_agent: bool = False,
+    ) -> None:
+        super().__init__(coordinator)
+        self._stack_name = stack["name"]
+        self._endpoint = stack.get("endpoint", "")
+        self._attr_unique_id = f"{entry.entry_id}_stop_{self._endpoint}_{self._stack_name}"
+        self._attr_name = "Stop"
+        self._attr_device_info = stack_device_info(
+            entry.entry_id, self._endpoint, self._stack_name, agent_name,
+            multi_agent=multi_agent,
+        )
+
+    async def async_press(self) -> None:
+        endpoint_param = f"?endpoint={self._endpoint}" if self._endpoint else ""
+        self.coordinator.mark_busy(self._endpoint, self._stack_name)
+        await asyncio.sleep(0.1)
+        try:
+            await self.coordinator.api_call(
+                "POST", f"/api/stacks/{self._stack_name}/stop{endpoint_param}"
+            )
+        finally:
+            self.coordinator.mark_done(self._endpoint, self._stack_name)
+            await self.coordinator.async_request_refresh()
+
+
+class DockgeRestartStackButton(CoordinatorEntity, ButtonEntity):
+    """Button to restart a stack."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:restart"
+
+    def __init__(
+        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
+        stack: dict, agent_name: str, *, multi_agent: bool = False,
+    ) -> None:
+        super().__init__(coordinator)
+        self._stack_name = stack["name"]
+        self._endpoint = stack.get("endpoint", "")
+        self._attr_unique_id = f"{entry.entry_id}_restart_{self._endpoint}_{self._stack_name}"
+        self._attr_name = "Restart"
+        self._attr_device_info = stack_device_info(
+            entry.entry_id, self._endpoint, self._stack_name, agent_name,
+            multi_agent=multi_agent,
+        )
+
+    async def async_press(self) -> None:
+        endpoint_param = f"?endpoint={self._endpoint}" if self._endpoint else ""
+        self.coordinator.mark_busy(self._endpoint, self._stack_name)
+        await asyncio.sleep(0.1)
+        try:
+            await self.coordinator.api_call(
+                "POST", f"/api/stacks/{self._stack_name}/restart{endpoint_param}"
+            )
+        finally:
+            self.coordinator.mark_done(self._endpoint, self._stack_name)
+            await self.coordinator.async_request_refresh()
+
+
+class DockgeDownStackButton(CoordinatorEntity, ButtonEntity):
+    """Button to stop and remove containers (make stack inactive)."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:power-off"
+
+    def __init__(
+        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
+        stack: dict, agent_name: str, *, multi_agent: bool = False,
+    ) -> None:
+        super().__init__(coordinator)
+        self._stack_name = stack["name"]
+        self._endpoint = stack.get("endpoint", "")
+        self._attr_unique_id = f"{entry.entry_id}_down_{self._endpoint}_{self._stack_name}"
+        self._attr_name = "Down"
+        self._attr_device_info = stack_device_info(
+            entry.entry_id, self._endpoint, self._stack_name, agent_name,
+            multi_agent=multi_agent,
+        )
+
+    async def async_press(self) -> None:
+        endpoint_param = f"?endpoint={self._endpoint}" if self._endpoint else ""
+        self.coordinator.mark_busy(self._endpoint, self._stack_name)
+        await asyncio.sleep(0.1)
+        try:
+            await self.coordinator.api_call(
+                "POST", f"/api/stacks/{self._stack_name}/down{endpoint_param}"
             )
         finally:
             self.coordinator.mark_done(self._endpoint, self._stack_name)
