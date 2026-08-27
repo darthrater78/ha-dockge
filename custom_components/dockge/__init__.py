@@ -66,52 +66,59 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await _handle_stack_action(call, action_path)
         return handler
 
-    for service_name, path in [
+    update_feature_supported = coordinator.data.get("update_feature_supported", True)
+
+    stack_services = [
         ("start_stack", "start"),
         ("stop_stack", "stop"),
         ("restart_stack", "restart"),
-        ("update_stack", "update"),
-        ("check_updates", "check-updates"),
-    ]:
+    ]
+    if update_feature_supported:
+        stack_services += [
+            ("update_stack", "update"),
+            ("check_updates", "check-updates"),
+        ]
+    for service_name, path in stack_services:
         hass.services.async_register(
             DOMAIN, service_name,
             _make_stack_handler(path),
             schema=STACK_ACTION_SCHEMA,
         )
 
-    async def _handle_update_all(call) -> None:
-        endpoint = _resolve_endpoint(call.data.get("agent", ""))
-        endpoint_param = f"?endpoint={endpoint}" if endpoint else ""
-        stacks = coordinator.data.get("stacks") or []
-        busy_keys = []
-        for stack in stacks:
-            ep = stack.get("endpoint", "")
-            if endpoint == "" or ep == endpoint:
-                coordinator.mark_busy(ep, stack["name"])
-                busy_keys.append((ep, stack["name"]))
-        await asyncio.sleep(0.1)  # Let event loop propagate busy state to frontend
-        try:
-            await coordinator.api_call("POST", f"/api/update-all{endpoint_param}")
-        finally:
-            for ep, name in busy_keys:
-                coordinator.mark_done(ep, name)
+    if update_feature_supported:
+        async def _handle_update_all(call) -> None:
+            endpoint = _resolve_endpoint(call.data.get("agent", ""))
+            endpoint_param = f"?endpoint={endpoint}" if endpoint else ""
+            stacks = coordinator.data.get("stacks") or []
+            busy_keys = []
+            for stack in stacks:
+                ep = stack.get("endpoint", "")
+                if endpoint == "" or ep == endpoint:
+                    coordinator.mark_busy(ep, stack["name"])
+                    busy_keys.append((ep, stack["name"]))
+            await asyncio.sleep(0.1)  # Let event loop propagate busy state to frontend
+            try:
+                await coordinator.api_call("POST", f"/api/update-all{endpoint_param}")
+            finally:
+                for ep, name in busy_keys:
+                    coordinator.mark_done(ep, name)
+                await coordinator.async_request_refresh()
+                coordinator.start_refresh_burst()
+
+        hass.services.async_register(
+            DOMAIN, "update_all", _handle_update_all,
+            schema=vol.Schema({vol.Optional("agent", default=""): cv.string}),
+        )
+
+        async def _handle_trigger_auto_updates(call) -> None:
+            await coordinator.api_call("POST", "/api/scheduler/trigger")
             await coordinator.async_request_refresh()
             coordinator.start_refresh_burst()
 
-    hass.services.async_register(
-        DOMAIN, "update_all", _handle_update_all,
-        schema=vol.Schema({vol.Optional("agent", default=""): cv.string}),
-    )
-
-    async def _handle_trigger_auto_updates(call) -> None:
-        await coordinator.api_call("POST", "/api/scheduler/trigger")
-        await coordinator.async_request_refresh()
-        coordinator.start_refresh_burst()
-
-    hass.services.async_register(
-        DOMAIN, "trigger_auto_updates", _handle_trigger_auto_updates,
-        schema=vol.Schema({}),
-    )
+        hass.services.async_register(
+            DOMAIN, "trigger_auto_updates", _handle_trigger_auto_updates,
+            schema=vol.Schema({}),
+        )
 
     async def _handle_system_prune(call) -> None:
         endpoint = _resolve_endpoint(call.data.get("agent", ""))
@@ -135,7 +142,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     for svc in ["start_stack", "stop_stack", "restart_stack", "update_stack", "check_updates", "update_all", "trigger_auto_updates", "system_prune"]:
-        hass.services.async_remove(DOMAIN, svc)
+        if hass.services.has_service(DOMAIN, svc):
+            hass.services.async_remove(DOMAIN, svc)
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:

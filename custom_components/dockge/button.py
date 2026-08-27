@@ -26,6 +26,7 @@ async def async_setup_entry(
     agents = coordinator.data.get("agents") or []
     agent_names = coordinator.data.get("agent_names", {})
     multi_agent = coordinator.data.get("multi_agent", False)
+    update_feature_supported = coordinator.data.get("update_feature_supported", True)
 
     if not agents:
         agents = [{"endpoint": ""}]
@@ -38,6 +39,7 @@ async def async_setup_entry(
         stacks = coordinator.data.get("stacks") or []
         names = coordinator.data.get("agent_names", {})
         is_multi = coordinator.data.get("multi_agent", False)
+        supported = coordinator.data.get("update_feature_supported", True)
         new_entities = []
         for stack in stacks:
             key = f"{stack.get('endpoint', '')}|{stack['name']}"
@@ -45,12 +47,13 @@ async def async_setup_entry(
                 tracked.add(key)
                 ep = stack.get("endpoint", "")
                 aname = agent_display_name(names, ep)
-                new_entities.append(
-                    DockgeUpdateStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
-                )
-                new_entities.append(
-                    DockgeCheckUpdatesButton(coordinator, entry, stack, aname, multi_agent=is_multi)
-                )
+                if supported:
+                    new_entities.append(
+                        DockgeUpdateStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
+                    )
+                    new_entities.append(
+                        DockgeCheckUpdatesButton(coordinator, entry, stack, aname, multi_agent=is_multi)
+                    )
                 new_entities.append(
                     DockgeStartStackButton(coordinator, entry, stack, aname, multi_agent=is_multi)
                 )
@@ -73,8 +76,9 @@ async def async_setup_entry(
         tracked.add(key)
         ep = stack.get("endpoint", "")
         aname = agent_display_name(agent_names, ep)
-        entities.append(DockgeUpdateStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
-        entities.append(DockgeCheckUpdatesButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
+        if update_feature_supported:
+            entities.append(DockgeUpdateStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
+            entities.append(DockgeCheckUpdatesButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
         entities.append(DockgeStartStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
         entities.append(DockgeStopStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))
         entities.append(DockgeRestartStackButton(coordinator, entry, stack, aname, multi_agent=multi_agent))

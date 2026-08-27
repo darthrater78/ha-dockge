@@ -24,8 +24,13 @@ async def async_setup_entry(
     tracked_stacks: set[str] = set()
     tracked_containers: set[str] = set()
 
+    if not coordinator.data.get("update_feature_supported", True):
+        return
+
     @callback
     def _async_add_new_entities() -> None:
+        if not coordinator.data.get("update_feature_supported", True):
+            return
         stacks = coordinator.data.get("stacks") or []
         agent_names = coordinator.data.get("agent_names", {})
         is_multi = coordinator.data.get("multi_agent", False)

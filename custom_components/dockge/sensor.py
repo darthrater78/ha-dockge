@@ -27,6 +27,7 @@ async def async_setup_entry(
     agents = coordinator.data.get("agents") or []
     agent_names = coordinator.data.get("agent_names", {})
     multi_agent = coordinator.data.get("multi_agent", False)
+    update_feature_supported = coordinator.data.get("update_feature_supported", True)
 
     if not agents:
         agents = [{"endpoint": ""}]
@@ -34,9 +35,10 @@ async def async_setup_entry(
     for agent in agents:
         endpoint = agent.get("endpoint", "")
         name = agent_display_name(agent_names, endpoint)
-        entities.append(
-            DockgeUpdatesAvailableSensor(coordinator, entry, endpoint, name, multi_agent),
-        )
+        if update_feature_supported:
+            entities.append(
+                DockgeUpdatesAvailableSensor(coordinator, entry, endpoint, name, multi_agent),
+            )
         entities.append(
             DockgeAgentSummarySensor(coordinator, entry, endpoint, name, multi_agent),
         )
@@ -44,7 +46,7 @@ async def async_setup_entry(
             DockgeVersionSensor(coordinator, entry, endpoint, name, multi_agent, version=agent.get("version")),
         )
         # Scheduler, history, and next-run sensors are server-wide (primary only)
-        if endpoint == "":
+        if endpoint == "" and update_feature_supported:
             entities.extend([
                 DockgeSchedulerStatusSensor(coordinator, entry, endpoint, name, multi_agent),
                 DockgeLastUpdateSensor(coordinator, entry, endpoint, name, multi_agent),

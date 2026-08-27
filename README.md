@@ -26,7 +26,7 @@ This integration requires a Dockge instance with the REST API enabled. You will 
 - A running [Dockge](https://github.com/finder39/dockge) instance (fork with REST API and update management)
 - An API key configured in Dockge
 
-> **Compatibility note:** Dockge **1.8.0+** removed the image update / auto-update scheduler feature (replaced by Compose Drift Check). Against Dockge 1.8.0+, the update-related entities and services below (marked "requires Dockge < 1.8.0") will be present but inactive — sensors report empty/disabled state and buttons/services no-op. All other entities and services work normally.
+> **Compatibility note:** Dockge **1.8.0+** removed the image update / auto-update scheduler feature (replaced by Compose Drift Check). The integration detects your Dockge server's version automatically — against Dockge 1.8.0+, the entities and services below (marked "requires Dockge < 1.8.0") are **not created** at all rather than showing broken or inactive. All other entities and services work normally on any version.
 
 ## Installation
 
@@ -59,7 +59,7 @@ Or click the button above to add the repository directly.
 
 | Type | Entity | Description |
 |------|--------|-------------|
-| Sensor | Image Updates Available | Count of stacks with available updates |
+| Sensor | Image Updates Available | Count of stacks with available updates (requires Dockge < 1.8.0) |
 | Sensor | Server Summary | Running container count with per-stack breakdown in attributes |
 | Sensor | Auto-Update Scheduler | Scheduler status with cron details (primary agent only, requires Dockge < 1.8.0) |
 | Sensor | Last Stack Update | Timestamp of most recent update (primary agent only, requires Dockge < 1.8.0) |
@@ -101,7 +101,7 @@ For a visual dashboard, check out the [Dockge Card](https://github.com/finder39/
 
 ### 1.8.1 (2026-08-27)
 - Fixed integration setup crashing with `Attempt to decode JSON with unexpected mimetype: text/html` against Dockge 1.8.0+, which removed the `/api/scheduler` and `/api/update-history` endpoints. The coordinator now treats these as optional and degrades gracefully.
-- Documented which entities and services require Dockge < 1.8.0 (see Compatibility note and tables above) now that Dockge 1.8.0 removed its image update / auto-update scheduler feature.
+- The integration now detects the Dockge server version and automatically skips creating the update-monitoring, scheduler, and auto-update entities/services (see tables above) when running against Dockge 1.8.0+, instead of leaving inactive buttons and empty sensors behind.
 
 ## Community
 

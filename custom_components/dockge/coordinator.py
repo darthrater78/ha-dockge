@@ -16,6 +16,26 @@ from .const import CONF_API_KEY, CONF_SCAN_INTERVAL, CONF_URL, DEFAULT_SCAN_INTE
 
 _LOGGER = logging.getLogger(__name__)
 
+# Dockge 1.8.0 removed the image update / auto-update scheduler feature.
+_UPDATE_FEATURE_REMOVED_IN = (1, 8, 0)
+
+
+def _parse_version(version: str | None) -> tuple[int, ...] | None:
+    """Parse a dotted version string (e.g. '1.8.0') into a comparable tuple."""
+    if not version:
+        return None
+    parts: list[int] = []
+    for part in version.split("."):
+        digits = ""
+        for ch in part:
+            if not ch.isdigit():
+                break
+            digits += ch
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts) if parts else None
+
 
 class DockgeCoordinator(DataUpdateCoordinator):
     """Coordinator to poll Dockge API for stack and scheduler data."""
@@ -102,6 +122,15 @@ class DockgeCoordinator(DataUpdateCoordinator):
         agent_names = self._agent_name_map(agents)
         multi_agent = len(agents) > 1
 
+        # Determine whether the primary server still supports the image update /
+        # auto-update scheduler feature (removed in Dockge 1.8.0). Unknown/unparseable
+        # versions are treated as supported so entities aren't hidden unexpectedly.
+        primary_version = next(
+            (a.get("version") for a in agents if a.get("endpoint", "") == ""), None
+        )
+        parsed_version = _parse_version(primary_version)
+        update_feature_supported = parsed_version is None or parsed_version < _UPDATE_FEATURE_REMOVED_IN
+
         # Preserve stacks from agents that are known but returned no stacks
         # (e.g. agent temporarily disconnected from Dockge primary)
         if self.data and multi_agent:
@@ -125,6 +154,7 @@ class DockgeCoordinator(DataUpdateCoordinator):
             "stacks": stacks,
             "scheduler": scheduler,
             "last_update": last_update,
+            "update_feature_supported": update_feature_supported,
         }
 
     async def api_call(self, method: str, path: str, json: dict | None = None, timeout: int = 30) -> dict | list | None:

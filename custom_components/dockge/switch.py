@@ -20,8 +20,13 @@ async def async_setup_entry(
     coordinator: DockgeCoordinator = hass.data[DOMAIN][entry.entry_id]
     tracked: set[str] = set()
 
+    if not coordinator.data.get("update_feature_supported", True):
+        return
+
     @callback
     def _async_add_new_entities() -> None:
+        if not coordinator.data.get("update_feature_supported", True):
+            return
         stacks = coordinator.data.get("stacks") or []
         agent_names = coordinator.data.get("agent_names", {})
         new_entities = []
