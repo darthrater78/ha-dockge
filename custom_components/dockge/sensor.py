@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -22,12 +19,10 @@ async def async_setup_entry(
     """Set up Dockge sensors."""
     coordinator: DockgeCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Agent-level sensors
     entities: list[SensorEntity] = []
     agents = coordinator.data.get("agents") or []
     agent_names = coordinator.data.get("agent_names", {})
     multi_agent = coordinator.data.get("multi_agent", False)
-    update_feature_supported = coordinator.data.get("update_feature_supported", True)
 
     if not agents:
         agents = [{"endpoint": ""}]
@@ -35,26 +30,13 @@ async def async_setup_entry(
     for agent in agents:
         endpoint = agent.get("endpoint", "")
         name = agent_display_name(agent_names, endpoint)
-        if update_feature_supported:
-            entities.append(
-                DockgeUpdatesAvailableSensor(coordinator, entry, endpoint, name, multi_agent),
-            )
         entities.append(
             DockgeAgentSummarySensor(coordinator, entry, endpoint, name, multi_agent),
         )
         entities.append(
             DockgeVersionSensor(coordinator, entry, endpoint, name, multi_agent, version=agent.get("version")),
         )
-        # Scheduler, history, and next-run sensors are server-wide (primary only)
-        if endpoint == "" and update_feature_supported:
-            entities.extend([
-                DockgeSchedulerStatusSensor(coordinator, entry, endpoint, name, multi_agent),
-                DockgeLastUpdateSensor(coordinator, entry, endpoint, name, multi_agent),
-                DockgeNextAutoUpdateSensor(coordinator, entry, endpoint, name, multi_agent),
-                DockgeNextImageCheckSensor(coordinator, entry, endpoint, name, multi_agent),
-            ])
 
-    # Global summary sensor (aggregates across all agents)
     if multi_agent:
         entities.append(DockgeGlobalSummarySensor(coordinator, entry))
 
@@ -153,7 +135,6 @@ class DockgeContainerSensor(CoordinatorEntity, SensorEntity):
         """Split 'registry/name:tag' into (name, tag)."""
         if ":" in image and not image.endswith(":"):
             name, tag = image.rsplit(":", 1)
-            # Avoid splitting on port numbers (e.g. registry:5000/image)
             if "/" in tag:
                 return image, "latest"
             return name, tag
@@ -175,173 +156,7 @@ class DockgeContainerSensor(CoordinatorEntity, SensorEntity):
             "health": svc.get("health"),
             "stack_name": self._stack_name,
             "agent_name": self._agent_name,
-            "update_available": bool(svc.get("imageUpdateAvailable")),
         }
-
-
-class DockgeUpdatesAvailableSensor(CoordinatorEntity, SensorEntity):
-    """Sensor showing count of stacks with available image updates."""
-
-    _attr_has_entity_name = True
-    _attr_icon = "mdi:update"
-
-    def __init__(
-        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
-        endpoint: str, agent_name: str, multi_agent: bool = False,
-    ) -> None:
-        super().__init__(coordinator)
-        self._endpoint = endpoint
-        self._agent_name = agent_name
-        self._attr_unique_id = f"{entry.entry_id}_updates_available_{endpoint}"
-        self._attr_name = "Image Updates Available"
-        self._attr_device_info = agent_device_info(entry.entry_id, endpoint, agent_name, multi_agent=multi_agent)
-
-    @property
-    def native_value(self) -> int:
-        stacks = self.coordinator.data.get("stacks") or []
-        return sum(
-            1 for s in stacks
-            if s.get("imageUpdatesAvailable") and s.get("endpoint", "") == self._endpoint
-        )
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        stacks = self.coordinator.data.get("stacks") or []
-        agent_stacks = [s for s in stacks if s.get("endpoint", "") == self._endpoint]
-        attrs = {"total_stacks": len(agent_stacks), "agent_name": self._agent_name}
-        if self._endpoint:
-            attrs["endpoint"] = self._endpoint
-        return attrs
-
-
-class DockgeSchedulerStatusSensor(CoordinatorEntity, SensorEntity):
-    """Sensor showing scheduler enabled/disabled status."""
-
-    _attr_has_entity_name = True
-    _attr_icon = "mdi:clock-outline"
-
-    def __init__(
-        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
-        endpoint: str, agent_name: str, multi_agent: bool = False,
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_scheduler_status_{endpoint}"
-        self._attr_name = "Auto-Update Scheduler"
-        self._attr_device_info = agent_device_info(entry.entry_id, endpoint, agent_name, multi_agent=multi_agent)
-
-    @property
-    def native_value(self) -> str:
-        scheduler = self.coordinator.data.get("scheduler") or {}
-        return "enabled" if scheduler.get("enabled") else "disabled"
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        scheduler = self.coordinator.data.get("scheduler") or {}
-        return {
-            "cron_expression": scheduler.get("cronExpression"),
-            "prune_after_update": scheduler.get("pruneAfterUpdate"),
-            "prune_all_after_update": scheduler.get("pruneAllAfterUpdate"),
-            "image_check_interval_hours": scheduler.get("imageCheckIntervalHours"),
-        }
-
-
-class DockgeLastUpdateSensor(CoordinatorEntity, SensorEntity):
-    """Sensor showing timestamp of the most recent update."""
-
-    _attr_has_entity_name = True
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_icon = "mdi:history"
-
-    def __init__(
-        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
-        endpoint: str, agent_name: str, multi_agent: bool = False,
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_last_update_{endpoint}"
-        self._attr_name = "Last Stack Update"
-        self._attr_device_info = agent_device_info(entry.entry_id, endpoint, agent_name, multi_agent=multi_agent)
-
-    @property
-    def native_value(self) -> datetime | None:
-        entry = self.coordinator.data.get("last_update")
-        if not entry:
-            return None
-        iso = entry.get("completedAt") or entry.get("startedAt")
-        if not iso:
-            return None
-        try:
-            return datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
-            return None
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        entry = self.coordinator.data.get("last_update")
-        if not entry:
-            return {}
-        return {
-            "stack": entry.get("stackName"),
-            "endpoint": entry.get("endpoint", ""),
-            "success": entry.get("success"),
-            "trigger": entry.get("triggerType"),
-            "duration_ms": entry.get("durationMs"),
-        }
-
-
-class DockgeNextAutoUpdateSensor(CoordinatorEntity, SensorEntity):
-    """Sensor showing the next scheduled auto-update time."""
-
-    _attr_has_entity_name = True
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_icon = "mdi:clock-fast"
-
-    def __init__(
-        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
-        endpoint: str, agent_name: str, multi_agent: bool = False,
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_next_auto_update_{endpoint}"
-        self._attr_name = "Next Auto Update"
-        self._attr_device_info = agent_device_info(entry.entry_id, endpoint, agent_name, multi_agent=multi_agent)
-
-    @property
-    def native_value(self) -> datetime | None:
-        scheduler = self.coordinator.data.get("scheduler") or {}
-        iso = scheduler.get("nextAutoUpdate")
-        if not iso:
-            return None
-        try:
-            return datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            return None
-
-
-class DockgeNextImageCheckSensor(CoordinatorEntity, SensorEntity):
-    """Sensor showing the next image update check time."""
-
-    _attr_has_entity_name = True
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_icon = "mdi:magnify-scan"
-
-    def __init__(
-        self, coordinator: DockgeCoordinator, entry: ConfigEntry,
-        endpoint: str, agent_name: str, multi_agent: bool = False,
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_next_image_check_{endpoint}"
-        self._attr_name = "Next Image Check"
-        self._attr_device_info = agent_device_info(entry.entry_id, endpoint, agent_name, multi_agent=multi_agent)
-
-    @property
-    def native_value(self) -> datetime | None:
-        scheduler = self.coordinator.data.get("scheduler") or {}
-        iso = scheduler.get("nextImageCheck")
-        if not iso:
-            return None
-        try:
-            return datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            return None
 
 
 class DockgeAgentSummarySensor(CoordinatorEntity, SensorEntity):
