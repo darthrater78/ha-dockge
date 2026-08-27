@@ -66,19 +66,27 @@ class DockgeCoordinator(DataUpdateCoordinator):
                     resp.raise_for_status()
                     stacks_resp = await resp.json()
 
-                # Fetch scheduler status
-                async with session.get(
-                    f"{self.url}/api/scheduler", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    resp.raise_for_status()
-                    scheduler_resp = await resp.json()
+                # Fetch scheduler status (optional — removed in Dockge 1.8.0+)
+                scheduler_resp: dict = {}
+                try:
+                    async with session.get(
+                        f"{self.url}/api/scheduler", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
+                    ) as resp:
+                        resp.raise_for_status()
+                        scheduler_resp = await resp.json()
+                except (aiohttp.ContentTypeError, ValueError):
+                    _LOGGER.debug("Scheduler endpoint not available (Dockge 1.8.0+), skipping")
 
-                # Fetch most recent update history entry
-                async with session.get(
-                    f"{self.url}/api/update-history?limit=1", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    resp.raise_for_status()
-                    history_resp = await resp.json()
+                # Fetch most recent update history entry (optional — removed in Dockge 1.8.0+)
+                history_resp: dict = {}
+                try:
+                    async with session.get(
+                        f"{self.url}/api/update-history?limit=1", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
+                    ) as resp:
+                        resp.raise_for_status()
+                        history_resp = await resp.json()
+                except (aiohttp.ContentTypeError, ValueError):
+                    _LOGGER.debug("Update history endpoint not available (Dockge 1.8.0+), skipping")
 
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with Dockge API: {err}") from err
