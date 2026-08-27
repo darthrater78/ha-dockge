@@ -11,13 +11,13 @@ Monitor update availability across all your Docker stacks, toggle auto-updates p
 
 ## Features
 
-- **Update monitoring** — per-stack and per-container binary sensors for available image updates
 - **Container status** — sensors showing each container's state (running, exited, etc.) with image and health details
-- **Auto-update control** — per-stack switches to enable/disable automatic updates
-- **Update actions** — buttons to update individual stacks, check for updates, update all, or trigger a scheduled run
-- **Scheduler status** — sensor showing auto-update scheduler state, cron expression, and next run times
-- **Update history** — sensor tracking the most recent stack update with result details
 - **Multi-agent support** — works with multiple Dockge agents, each with their own device hierarchy
+- **Update monitoring** — per-stack and per-container binary sensors for available image updates (requires Dockge < 1.8.0)
+- **Auto-update control** — per-stack switches to enable/disable automatic updates (requires Dockge < 1.8.0)
+- **Update actions** — buttons to update individual stacks, check for updates, update all, or trigger a scheduled run (requires Dockge < 1.8.0)
+- **Scheduler status** — sensor showing auto-update scheduler state, cron expression, and next run times (requires Dockge < 1.8.0)
+- **Update history** — sensor tracking the most recent stack update with result details (requires Dockge < 1.8.0)
 
 ## Prerequisites
 
@@ -25,6 +25,8 @@ This integration requires a Dockge instance with the REST API enabled. You will 
 
 - A running [Dockge](https://github.com/finder39/dockge) instance (fork with REST API and update management)
 - An API key configured in Dockge
+
+> **Compatibility note:** Dockge **1.8.0+** removed the image update / auto-update scheduler feature (replaced by Compose Drift Check). Against Dockge 1.8.0+, the update-related entities and services below (marked "requires Dockge < 1.8.0") will be present but inactive — sensors report empty/disabled state and buttons/services no-op. All other entities and services work normally.
 
 ## Installation
 
@@ -59,22 +61,22 @@ Or click the button above to add the repository directly.
 |------|--------|-------------|
 | Sensor | Image Updates Available | Count of stacks with available updates |
 | Sensor | Server Summary | Running container count with per-stack breakdown in attributes |
-| Sensor | Auto-Update Scheduler | Scheduler status with cron details (primary agent only) |
-| Sensor | Last Stack Update | Timestamp of most recent update (primary agent only) |
-| Sensor | Next Auto Update | Next scheduled auto-update time (primary agent only) |
-| Sensor | Next Image Check | Next scheduled image check time (primary agent only) |
+| Sensor | Auto-Update Scheduler | Scheduler status with cron details (primary agent only, requires Dockge < 1.8.0) |
+| Sensor | Last Stack Update | Timestamp of most recent update (primary agent only, requires Dockge < 1.8.0) |
+| Sensor | Next Auto Update | Next scheduled auto-update time (primary agent only, requires Dockge < 1.8.0) |
+| Sensor | Next Image Check | Next scheduled image check time (primary agent only, requires Dockge < 1.8.0) |
 | Sensor | Global Summary | Aggregate across all agents (multi-agent only, on primary device) |
 
 ### Stack-level (per stack device)
 
 | Type | Entity | Description |
 |------|--------|-------------|
-| Binary Sensor | Update Available | On when stack has image updates |
-| Binary Sensor | {container} Update Available | On when a specific container has updates |
+| Binary Sensor | Update Available | On when stack has image updates (requires Dockge < 1.8.0) |
+| Binary Sensor | {container} Update Available | On when a specific container has updates (requires Dockge < 1.8.0) |
 | Sensor | {container} | Container state with image and health attributes |
-| Button | Update | Pull latest images and recreate the stack |
-| Button | Check Updates | Check for new image updates |
-| Switch | Auto Update | Enable/disable auto-updates for this stack |
+| Button | Update | Pull latest images and recreate the stack (requires Dockge < 1.8.0) |
+| Button | Check Updates | Check for new image updates (requires Dockge < 1.8.0) |
+| Switch | Auto Update | Enable/disable auto-updates for this stack (requires Dockge < 1.8.0) |
 
 ## Services
 
@@ -85,15 +87,21 @@ All services are available under the `dockge` domain (e.g., `dockge.start_stack`
 | `start_stack` | `stack_name`, `agent`? | Start a Docker Compose stack |
 | `stop_stack` | `stack_name`, `agent`? | Stop a Docker Compose stack |
 | `restart_stack` | `stack_name`, `agent`? | Restart a Docker Compose stack |
-| `update_stack` | `stack_name`, `agent`? | Pull latest images and recreate a stack |
-| `check_updates` | `stack_name`, `agent`? | Check for image updates on a stack |
-| `update_all` | `agent`? | Update all stacks (optionally on a specific agent) |
-| `trigger_auto_updates` | _(none)_ | Trigger auto-updates on all stacks with auto-update enabled |
+| `update_stack` | `stack_name`, `agent`? | Pull latest images and recreate a stack (requires Dockge < 1.8.0) |
+| `check_updates` | `stack_name`, `agent`? | Check for image updates on a stack (requires Dockge < 1.8.0) |
+| `update_all` | `agent`? | Update all stacks (optionally on a specific agent) (requires Dockge < 1.8.0) |
+| `trigger_auto_updates` | _(none)_ | Trigger auto-updates on all stacks with auto-update enabled (requires Dockge < 1.8.0) |
 | `system_prune` | `agent`? | Run Docker system prune to clean up unused images, containers, and networks |
 
 ## Dashboard Card
 
 For a visual dashboard, check out the [Dockge Card](https://github.com/finder39/dockge-card) — a custom Lovelace card that auto-discovers your servers and stacks with real-time status, actions, and processing indicators.
+
+## Version History
+
+### 1.8.1 (2026-08-27)
+- Fixed integration setup crashing with `Attempt to decode JSON with unexpected mimetype: text/html` against Dockge 1.8.0+, which removed the `/api/scheduler` and `/api/update-history` endpoints. The coordinator now treats these as optional and degrades gracefully.
+- Documented which entities and services require Dockge < 1.8.0 (see Compatibility note and tables above) now that Dockge 1.8.0 removed its image update / auto-update scheduler feature.
 
 ## Community
 
