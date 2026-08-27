@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class DockgeCoordinator(DataUpdateCoordinator):
-    """Coordinator to poll Dockge API for stack and scheduler data."""
+    """Coordinator to poll Dockge API for stack data."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
@@ -49,48 +49,27 @@ class DockgeCoordinator(DataUpdateCoordinator):
         return mapping
 
     async def _async_update_data(self) -> dict:
-        """Fetch agents, stacks, scheduler, and last update from Dockge API."""
+        """Fetch agents and stacks from Dockge API."""
         try:
             async with aiohttp.ClientSession() as session:
-                # Fetch agents (for name mapping)
                 async with session.get(
                     f"{self.url}/api/agents", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     resp.raise_for_status()
                     agents_resp = await resp.json()
 
-                # Fetch all stacks (from all agents) — longer timeout since it proxies to agents
                 async with session.get(
                     f"{self.url}/api/stacks", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=30)
                 ) as resp:
                     resp.raise_for_status()
                     stacks_resp = await resp.json()
 
-                # Fetch scheduler status
-                async with session.get(
-                    f"{self.url}/api/scheduler", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    resp.raise_for_status()
-                    scheduler_resp = await resp.json()
-
-                # Fetch most recent update history entry
-                async with session.get(
-                    f"{self.url}/api/update-history?limit=1", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    resp.raise_for_status()
-                    history_resp = await resp.json()
-
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with Dockge API: {err}") from err
 
-        # Unwrap API envelope responses
         agents = agents_resp.get("agents", []) if isinstance(agents_resp, dict) else []
         stacks = stacks_resp.get("stacks", []) if isinstance(stacks_resp, dict) else []
-        scheduler = scheduler_resp if isinstance(scheduler_resp, dict) else {}
-        history_entries = history_resp.get("entries", []) if isinstance(history_resp, dict) else []
-        last_update = history_entries[0] if history_entries else None
 
-        # Build agent name map for entity naming
         agent_names = self._agent_name_map(agents)
         multi_agent = len(agents) > 1
 
@@ -115,12 +94,10 @@ class DockgeCoordinator(DataUpdateCoordinator):
             "agent_names": agent_names,
             "multi_agent": multi_agent,
             "stacks": stacks,
-            "scheduler": scheduler,
-            "last_update": last_update,
         }
 
     async def api_call(self, method: str, path: str, json: dict | None = None, timeout: int = 30) -> dict | list | None:
-        """Make an API call to Dockge (for actions like update, toggle)."""
+        """Make an API call to Dockge (for actions like start, stop, restart)."""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.request(
@@ -151,7 +128,6 @@ class DockgeCoordinator(DataUpdateCoordinator):
         key = self._busy_key(endpoint, stack_name)
         self._busy_stacks.add(key)
         _LOGGER.debug("Stack marked BUSY: %s (busy set: %s)", key, self._busy_stacks)
-        # Pass a shallow copy so HA detects the data as "changed" and pushes to frontend
         self.async_set_updated_data({**self.data})
 
     def mark_done(self, endpoint: str, stack_name: str) -> None:
@@ -175,7 +151,7 @@ class DockgeCoordinator(DataUpdateCoordinator):
     async def _run_refresh_burst(self) -> None:
         """Poll every 30s for 5 minutes."""
         try:
-            for _ in range(10):  # 10 × 30s = 5 minutes
+            for _ in range(10):  # 10 x 30s = 5 minutes
                 await asyncio.sleep(30)
                 await self.async_request_refresh()
         except asyncio.CancelledError:

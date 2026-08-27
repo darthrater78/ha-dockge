@@ -49,55 +49,6 @@ restart_stack:
       selector:
         text:
 
-update_stack:
-  name: Update Stack
-  description: Pull latest images and recreate a Docker Compose stack
-  fields:
-    stack_name:
-      name: Stack Name
-      description: Name of the stack to update
-      required: true
-      selector:
-        text:
-    agent:
-      name: Agent
-      description: Agent name, e.g. "Gastly" (leave empty for primary server)
-      default: ""
-      selector:
-        text:
-
-check_updates:
-  name: Check Updates
-  description: Force check for image updates on a stack
-  fields:
-    stack_name:
-      name: Stack Name
-      description: Name of the stack to check
-      required: true
-      selector:
-        text:
-    agent:
-      name: Agent
-      description: Agent name, e.g. "Gastly" (leave empty for primary server)
-      default: ""
-      selector:
-        text:
-
-update_all:
-  name: Update All
-  description: Update all stacks on a specific agent or all agents
-  fields:
-    agent:
-      name: Agent
-      description: Agent name, e.g. "Gastly" (leave empty for all agents)
-      default: ""
-      selector:
-        text:
-
-trigger_auto_updates:
-  name: Trigger Auto Updates
-  description: Run auto-updates on all stacks that have auto-update enabled
-
 system_prune:
   name: System Prune
   description: Run Docker system prune to clean up unused images, containers, and networks.
