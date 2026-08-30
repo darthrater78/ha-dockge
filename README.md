@@ -2,12 +2,48 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/release/darthrater78/ha-dockge.svg)](https://github.com/darthrater78/ha-dockge/releases/latest)
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-blueviolet)](https://claude.ai/claude-code)
 
 Home Assistant integration for monitoring and controlling Docker stacks via the [Dockge](https://github.com/darthrater78/dockge) REST API.
 
 See container status across all your stacks, start/stop/restart stacks, and run system prune — all from within Home Assistant.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=darthrater78&repository=ha-dockge&category=integration)
+
+---
+
+## Built Entirely by Claude Code
+
+**Every line of code in this project was written by [Claude Code](https://claude.ai/claude-code)**, Anthropic's AI coding agent. From the initial scaffold to the latest refactor — 49 commits, 9 source modules, config flow, coordinator, sensors, buttons, switches, services, device hierarchy, multi-agent support — all of it was generated through conversational AI-assisted development.
+
+This isn't a project with "some AI help." There is no hand-written code. The entire integration was designed, implemented, debugged, refactored, and documented through iterative prompting sessions with Claude Code.
+
+### How it was built
+
+The project evolved through a series of Claude Code sessions, each building on the last:
+
+1. **Scaffolding** — Claude generated the initial Home Assistant integration structure: config flow, coordinator, constants, and manifest
+2. **Entity platforms** — Sensors, binary sensors, buttons, and switches were added one platform at a time, each in its own commit
+3. **Device hierarchy** — Claude designed the agent-level and stack-level device tree so entities group naturally in the HA UI
+4. **Multi-agent support** — Support for multiple Dockge agents (remote Docker hosts) was implemented and then debugged across several iterations
+5. **Stack lifecycle controls** — Start, stop, restart, and down buttons per stack, with processing-state tracking and refresh bursts for near-real-time UI updates
+6. **Scope pivot (v2.0.0)** — The entire update-monitoring subsystem (auto-update scheduler, image update checks, update history, version-gating) was stripped out in a single refactor, repositioning the integration from "container updates" to "container control"
+
+### Why this is almost a new project
+
+The original vision was a **container update monitor** — it tracked image versions, showed update-available badges, ran scheduled update checks, and could trigger auto-updates. That required a large surface area: scheduler sensors, update history sensors, auto-update switches, binary sensors for update availability, and multiple service calls for checking and applying updates.
+
+In **v2.0.0**, all of that was removed. What remains is a focused **container control** integration: see what's running, start/stop/restart stacks, and clean up unused resources. The codebase is smaller, the API surface is narrower, and the purpose is clearer. If you were tracking this project before v2.0.0, what you see now is a fundamentally different tool.
+
+---
+
+## Companion Project: Dockge Fork
+
+This integration is designed to work with **[darthrater78/dockge](https://github.com/darthrater78/dockge)** — a fork of the original Dockge that adds a REST API for programmatic stack control. The upstream Dockge uses only WebSocket communication; this fork adds the HTTP endpoints this integration depends on.
+
+You need the forked Dockge, not the original. The REST API and API key authentication are what make this integration possible.
+
+---
 
 ## Features
 
@@ -100,10 +136,6 @@ For a visual dashboard, check out the [Dockge Card](https://github.com/darthrate
 
 - [Home Assistant Community Forum thread](https://community.home-assistant.io/t/hacs-dockge-monitor-and-manage-docker-stacks-from-home-assistant/992901)
 - [GitHub Issues](https://github.com/darthrater78/ha-dockge/issues)
-
-## Vibecoded
-
-This integration was built entirely through vibe coding with [Claude Code](https://claude.ai/claude-code).
 
 ## License
 
