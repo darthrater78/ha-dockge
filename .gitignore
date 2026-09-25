@@ -11,3 +11,7 @@ build/
 venv/
 .env
 .DS_Store
+
+# dev-skills session state
+.claude/
+.pytest_cache/

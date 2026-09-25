@@ -14,7 +14,7 @@ See container status across all your stacks, start/stop/restart stacks, and run 
 
 ## Built Entirely by Claude Code
 
-**Every line of code in this project was written by [Claude Code](https://claude.ai/claude-code)**, Anthropic's AI coding agent. From the initial scaffold to the latest refactor — 49 commits, 9 source modules, config flow, coordinator, sensors, buttons, switches, services, device hierarchy, multi-agent support — all of it was generated through conversational AI-assisted development.
+**Every line of code in this project was written by [Claude Code](https://claude.ai/claude-code)**, Anthropic's AI coding agent. From the initial scaffold to the latest refactor — 49 commits, 9 source modules, config flow, coordinator, sensors, buttons, services, device hierarchy, multi-agent support — all of it was generated through conversational AI-assisted development.
 
 This isn't a project with "some AI help." There is no hand-written code. The entire integration was designed, implemented, debugged, refactored, and documented through iterative prompting sessions with Claude Code.
 
@@ -107,30 +107,28 @@ Or click the button above to add the repository directly.
 
 ## Services
 
-All services are available under the `dockge` domain (e.g., `dockge.start_stack`). The optional `agent` field accepts an agent display name (e.g., "Gastly") for multi-agent setups; leave empty for the primary server.
+All services are available under the `dockge` domain (e.g., `dockge.start_stack`). The optional `agent` field accepts an agent display name (e.g., "Gastly") for multi-agent setups; leave empty for the primary server. If you have more than one Dockge instance configured, set `config_entry_id` to pick which one. Stack names must match Dockge's own rule: lowercase letters, digits, `-` and `_`.
 
 | Service | Fields | Description |
 |---------|--------|-------------|
-| `start_stack` | `stack_name`, `agent`? | Start a Docker Compose stack |
-| `stop_stack` | `stack_name`, `agent`? | Stop a Docker Compose stack |
-| `restart_stack` | `stack_name`, `agent`? | Restart a Docker Compose stack |
-| `system_prune` | `agent`? | Run Docker system prune to clean up unused images, containers, and networks |
+| `start_stack` | `stack_name`, `agent`?, `config_entry_id`? | Start a Docker Compose stack |
+| `stop_stack` | `stack_name`, `agent`?, `config_entry_id`? | Stop a Docker Compose stack |
+| `restart_stack` | `stack_name`, `agent`?, `config_entry_id`? | Restart a Docker Compose stack |
+| `system_prune` | `agent`?, `config_entry_id`? | Run Docker system prune to clean up unused images, containers, and networks |
 
 ## Dashboard Card
 
 For a visual dashboard, check out the [Dockge Card](https://github.com/darthrater78/dockge-card) — a custom Lovelace card that auto-discovers your servers and stacks with real-time status, actions, and processing indicators.
 
+## Security
+
+- **API key in transit:** the key is sent in an `X-API-Key` header on every request. Use an `https://` URL where you can; over plain `http://` anyone on the network path can read it.
+- **API key at rest:** Home Assistant stores it, like every integration's settings, unencrypted in `.storage/core.config_entries`. Home Assistant has no at-rest encryption for config entries, so protect the config directory and keep backups encrypted (Home Assistant's own backups are encrypted by default).
+- **Who can use it:** any Home Assistant user who can call services can start, stop and prune through this integration with the stored key.
+
 ## Version History
 
-### 2.0.0 (2026-08-27)
-- Removed all image update monitoring, auto-update scheduler, and update-related entities/services. The integration is now focused purely on stack control (start/stop/restart/down) and container status monitoring.
-- Removed: `update_stack`, `check_updates`, `update_all`, `trigger_auto_updates` services
-- Removed: Update Available binary sensors, Auto Update switches, scheduler sensors, update history sensors, image updates available sensor
-- Removed: version-gating logic (no longer needed)
-- Coordinator no longer fetches `/api/scheduler` or `/api/update-history` endpoints
-
-### 1.8.1 (2026-08-27)
-- Fixed integration setup crashing with `Attempt to decode JSON with unexpected mimetype: text/html` against Dockge 1.8.0+, which removed the `/api/scheduler` and `/api/update-history` endpoints.
+See [CHANGELOG.md](CHANGELOG.md) and the [GitHub releases](https://github.com/darthrater78/ha-dockge/releases/latest).
 
 ## Community
 

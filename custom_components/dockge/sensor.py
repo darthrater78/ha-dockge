@@ -8,7 +8,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
 from .coordinator import DockgeCoordinator
 from .devices import agent_device_info, agent_display_name, stack_device_info
 
@@ -17,7 +16,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up Dockge sensors."""
-    coordinator: DockgeCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: DockgeCoordinator = entry.runtime_data
 
     entities: list[SensorEntity] = []
     agents = coordinator.data.get("agents") or []
