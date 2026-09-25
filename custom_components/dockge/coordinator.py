@@ -10,9 +10,19 @@ import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_API_KEY, CONF_SCAN_INTERVAL, CONF_URL, DEFAULT_SCAN_INTERVAL
+from .const import (
+    CONF_API_KEY,
+    CONF_SCAN_INTERVAL,
+    CONF_URL,
+    DEFAULT_SCAN_INTERVAL,
+    STACK_ACTION_TIMEOUT,
+    STACK_ACTIONS,
+    STACK_NAME_RE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +34,7 @@ class DockgeCoordinator(DataUpdateCoordinator):
         """Initialize the coordinator."""
         self.url = entry.data[CONF_URL].rstrip("/")
         self.api_key = entry.data[CONF_API_KEY]
+        self._session = async_get_clientsession(hass)
         self._busy_stacks: set[str] = set()
         self._refresh_burst_task: asyncio.Task | None = None
         scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
@@ -51,20 +62,19 @@ class DockgeCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict:
         """Fetch agents and stacks from Dockge API."""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self.url}/api/agents", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    resp.raise_for_status()
-                    agents_resp = await resp.json()
+            async with self._session.get(
+                f"{self.url}/api/agents", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                resp.raise_for_status()
+                agents_resp = await resp.json()
 
-                async with session.get(
-                    f"{self.url}/api/stacks", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    resp.raise_for_status()
-                    stacks_resp = await resp.json()
+            async with self._session.get(
+                f"{self.url}/api/stacks", headers=self._headers(), timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                resp.raise_for_status()
+                stacks_resp = await resp.json()
 
-        except aiohttp.ClientError as err:
+        except (aiohttp.ClientError, TimeoutError) as err:
             raise UpdateFailed(f"Error communicating with Dockge API: {err}") from err
 
         agents = agents_resp.get("agents", []) if isinstance(agents_resp, dict) else []
@@ -96,24 +106,83 @@ class DockgeCoordinator(DataUpdateCoordinator):
             "stacks": stacks,
         }
 
-    async def api_call(self, method: str, path: str, json: dict | None = None, timeout: int = 30) -> dict | list | None:
-        """Make an API call to Dockge (for actions like start, stop, restart)."""
+    async def api_call(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+        json: dict | None = None,
+        timeout: int = 30,
+    ) -> dict | list | None:
+        """Make an API call to Dockge (for actions like start, stop, restart).
+
+        `path` must already be safe; caller-supplied values belong in `params`.
+        """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.request(
-                    method,
-                    f"{self.url}{path}",
-                    headers=self._headers(),
-                    json=json,
-                    timeout=aiohttp.ClientTimeout(total=timeout),
-                ) as resp:
-                    resp.raise_for_status()
-                    try:
-                        return await resp.json()
-                    except (aiohttp.ContentTypeError, ValueError):
-                        return None
-        except aiohttp.ClientError as err:
-            raise UpdateFailed(f"Dockge API call failed: {err}") from err
+            async with self._session.request(
+                method,
+                f"{self.url}{path}",
+                headers=self._headers(),
+                params=params,
+                json=json,
+                timeout=aiohttp.ClientTimeout(total=timeout),
+            ) as resp:
+                resp.raise_for_status()
+                try:
+                    return await resp.json()
+                except (aiohttp.ContentTypeError, ValueError):
+                    return None
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise HomeAssistantError(f"Dockge API call failed: {err}") from err
+
+    @staticmethod
+    def _endpoint_params(endpoint: str) -> dict[str, str] | None:
+        return {"endpoint": endpoint} if endpoint else None
+
+    async def async_stack_action(self, endpoint: str, stack_name: str, action: str) -> None:
+        """Run a stack action, showing the stack as busy while it runs."""
+        if action not in STACK_ACTIONS:
+            raise ServiceValidationError(f"Unknown stack action: {action}")
+        if not STACK_NAME_RE.fullmatch(stack_name):
+            raise ServiceValidationError(
+                f"Invalid stack name {stack_name!r}: only lowercase letters, digits, '-' and '_' are allowed"
+            )
+
+        self.mark_busy(endpoint, stack_name)
+        await asyncio.sleep(0.1)  # let entities render the busy state first
+        try:
+            await self.api_call(
+                "POST",
+                f"/api/stacks/{stack_name}/{action}",
+                params=self._endpoint_params(endpoint),
+                timeout=STACK_ACTION_TIMEOUT,
+            )
+        finally:
+            self.mark_done(endpoint, stack_name)
+            await self.async_request_refresh()
+            self.start_refresh_burst()
+
+    async def async_system_prune(self, endpoint: str) -> None:
+        """Run Docker system prune on one agent."""
+        await self.api_call(
+            "POST", "/api/system/prune", params=self._endpoint_params(endpoint)
+        )
+        await self.async_request_refresh()
+
+    def resolve_endpoint(self, agent: str) -> str:
+        """Resolve an agent display name or endpoint. Empty string = primary."""
+        if not agent:
+            return ""
+        data = self.data or {}
+        agent_names: dict[str, str] = data.get("agent_names", {})
+        for endpoint, name in agent_names.items():
+            if name.lower() == agent.lower():
+                return endpoint
+        known_endpoints = {a.get("endpoint", "") for a in data.get("agents") or []}
+        if agent in known_endpoints:
+            return agent
+        raise ServiceValidationError(f"Unknown Dockge agent: {agent!r}")
 
     def _busy_key(self, endpoint: str, stack_name: str) -> str:
         """Build a unique key for a busy stack."""
@@ -147,6 +216,11 @@ class DockgeCoordinator(DataUpdateCoordinator):
         self._refresh_burst_task = self.hass.async_create_background_task(
             self._run_refresh_burst(), "dockge_refresh_burst"
         )
+
+    def cancel_refresh_burst(self) -> None:
+        """Stop any running refresh burst (called on unload)."""
+        if self._refresh_burst_task is not None:
+            self._refresh_burst_task.cancel()
 
     async def _run_refresh_burst(self) -> None:
         """Poll every 30s for 5 minutes."""

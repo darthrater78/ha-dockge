@@ -2,25 +2,49 @@ name: Validate
 
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate-hacs:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - name: HACS validation
-        uses: "hacs/action@main"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          category: "integration"
+          persist-credentials: false
 
-  validate-hassfest:
+      # Intentionally unpinned: HACS asks for @main so validation always uses
+      # HACS's current rules; a pinned snapshot would pass stale integrations.
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Shellcheck
+        run: shellcheck --severity=warning scripts/*.sh
+
+      # Same script as local development: syntax, JSON, and hassfest (pinned by digest).
+      - name: Validate integration
+        run: bash scripts/validate.sh
+
+      - name: Tests
+        run: AUDIT=1 bash scripts/test.sh
