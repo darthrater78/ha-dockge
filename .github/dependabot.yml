@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions and their version comments current.
+  # The integration has no Python requirements; the hassfest image digest in
+  # scripts/validate.sh is bumped by hand (instructions in the script).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"

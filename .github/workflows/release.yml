@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A commit reaching main proves nothing on its own about whether CI passed
+  # on it -- only that it was merged. This job checks both before publishing.
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag is on default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"; then
+            echo "::error::Tag $GITHUB_REF_NAME is not on $DEFAULT_BRANCH. Releases come from the default branch only."
+            exit 1
+          fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))
+          while true; do
+            runs=$(gh api \
+              "repos/${REPO}/actions/workflows/validate.yaml/runs?head_sha=${SHA}&per_page=100" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')
+
+            if [ -z "$runs" ]; then
+              echo "::error::Validate has never run for ${SHA}, so nothing has tested this commit."
+              echo "Run it by hand (Actions -> Validate -> Run workflow on main), then re-tag." >&2
+              exit 1
+            fi
+
+            if printf '%s\n' "$runs" | awk '$2 == "success" { hit = 1 } END { exit !hit }'; then
+              echo "Validate passed for ${SHA}."
+              exit 0
+            fi
+
+            unfinished=$(printf '%s\n' "$runs" | awk '$1 != "completed"' | wc -l)
+            if [ "$unfinished" -eq 0 ]; then
+              echo "::error::Validate ran for ${SHA} and did not pass. Refusing to release."
+              printf '%s\n' "$runs" | sed 's/^/  /' >&2
+              exit 1
+            fi
+
+            echo "Validate is still running for ${SHA} (${unfinished} unfinished) -- waiting."
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for Validate on ${SHA} to finish."
+              exit 1
+            fi
+            sleep 20
+          done
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify tag matches the version in the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version custom_components/dockge/manifest.json)"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::No version in custom_components/dockge/manifest.json. Refusing to publish."
+            exit 1
+          fi
+          if [ "v${version}" != "$TAG" ]; then
+            echo "::error::Tag $TAG is on a commit that declares ${version}. Merge the release first, then tag the merged commit."
+            exit 1
+          fi
+
+      - name: Extract release notes
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { flag = 1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for ${version}. Refusing to publish."
+            exit 1
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+      - name: Verify release is published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft --jq 'select(.isDraft == false) | .tagName' | grep -qx "$GITHUB_REF_NAME"
