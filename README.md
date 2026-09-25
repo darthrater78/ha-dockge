@@ -6,6 +6,8 @@
 
 Home Assistant integration for monitoring and controlling Docker stacks via the [Dockge](https://github.com/darthrater78/dockge) REST API.
 
+**[GitHub repository](https://github.com/darthrater78/ha-dockge)** · **[Release notes for v2.1.0](https://github.com/darthrater78/ha-dockge/releases/tag/v2.1.0)**
+
 See container status across all your stacks, start/stop/restart stacks, and run system prune — all from within Home Assistant.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=darthrater78&repository=ha-dockge&category=integration)
@@ -14,7 +16,7 @@ See container status across all your stacks, start/stop/restart stacks, and run 
 
 ## Built Entirely by Claude Code
 
-**Every line of code in this project was written by [Claude Code](https://claude.ai/claude-code)**, Anthropic's AI coding agent. From the initial scaffold to the latest refactor — 49 commits, 9 source modules, config flow, coordinator, sensors, buttons, services, device hierarchy, multi-agent support — all of it was generated through conversational AI-assisted development.
+**Every line of code in this project was written by [Claude Code](https://claude.ai/claude-code)**, Anthropic's AI coding agent. From the initial scaffold to the latest refactor — 7 source modules, a test suite, CI, config flow, coordinator, sensors, buttons, services, device hierarchy, multi-agent support — all of it was generated through conversational AI-assisted development.
 
 This isn't a project with "some AI help." There is no hand-written code. The entire integration was designed, implemented, debugged, refactored, and documented through iterative prompting sessions with Claude Code.
 
@@ -28,6 +30,7 @@ The project evolved through a series of Claude Code sessions, each building on t
 4. **Multi-agent support** — Support for multiple Dockge agents (remote Docker hosts) was implemented and then debugged across several iterations
 5. **Stack lifecycle controls** — Start, stop, restart, and down buttons per stack, with processing-state tracking and refresh bursts for near-real-time UI updates
 6. **Scope pivot (v2.0.0)** — The entire update-monitoring subsystem (auto-update scheduler, image update checks, update history, version-gating) was stripped out in a single refactor, repositioning the integration from "container updates" to "container control"
+7. **Audit and hardening (v2.1.0)** — A security and CI audit led to input validation on service calls, correct behavior with multiple Dockge instances, a pytest suite, and hardened GitHub Actions with a gated release workflow
 
 ### Why this is almost a new project
 

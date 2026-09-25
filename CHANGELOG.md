@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-25
+
+### Added
+- Optional `config_entry_id` field on every service, to choose the Dockge instance when more than one is configured.
+- A pytest suite (`scripts/test.sh`) and a local validation script (`scripts/validate.sh`); CI runs both.
+
 ### Security
 - Stack names are checked against Dockge's own naming rule before any API call, and the agent endpoint is sent as a properly encoded query parameter. Before, a crafted stack or agent name in a service call could change which Dockge API URL was called.
 - Service calls with an unknown agent name are rejected instead of being passed through to Dockge as a raw endpoint.
@@ -40,7 +46,9 @@ All notable changes to this project are documented here. The format follows
 - The version-gating logic, which was no longer needed.
 - Polling of the `/api/scheduler` and `/api/update-history` endpoints.
 
-## [1.8.1] - 2026-08-27
+## 1.8.1 - 2026-08-27
+
+Never tagged or published as a release; its fix shipped in 2.0.0.
 
 ### Fixed
 - Setup crashed with `Attempt to decode JSON with unexpected mimetype: text/html` against Dockge 1.8.0+, which removed the `/api/scheduler` and `/api/update-history` endpoints.
@@ -53,7 +61,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 - Codeowner and repository URLs now point to darthrater78/ha-dockge.
 
-[Unreleased]: https://github.com/darthrater78/ha-dockge/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/darthrater78/ha-dockge/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/darthrater78/ha-dockge/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/darthrater78/ha-dockge/compare/v1.8.0...v2.0.0
-[1.8.1]: https://github.com/darthrater78/ha-dockge/releases
 [1.8.0]: https://github.com/darthrater78/ha-dockge/releases/tag/v1.8.0
