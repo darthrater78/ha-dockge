@@ -13,11 +13,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 docker run --rm -e AUDIT -e PYTHONDONTWRITEBYTECODE=1 -v "$repo_root":/src -w /src "$PYTHON_IMAGE" bash -c '
   set -euo pipefail
   pip install --quiet --root-user-action=ignore --disable-pip-version-check -r requirements_test.txt
-  # homeassistant pins cryptography==48.0.1 and PyJWT==2.13.0, which have open
-  # advisories (cryptography: CVE-2026-69247/69248/69249; PyJWT: PYSEC-2026-4140
-  # to 4152). Test with the fixed releases until HA bumps them.
-  pip install --quiet --root-user-action=ignore --disable-pip-version-check cryptography==50.0.1 PyJWT==2.15.1 2>&1 \
-    | grep -v "dependency conflicts\|requires cryptography\|requires PyJWT" || true
+  # homeassistant pins Pillow==12.3.0, which has open advisories (PYSEC-2026-4326
+  # to 4343 and others, fixed in 13.0.0). Test with the fixed release until HA
+  # bumps it.
+  pip install --quiet --root-user-action=ignore --disable-pip-version-check pillow==13.0.0 2>&1 \
+    | grep -v "dependency conflicts\|requires Pillow\|requires pillow" || true
   if [ "${AUDIT:-0}" = 1 ]; then
     pip install --quiet --root-user-action=ignore --disable-pip-version-check pip-audit
     pip-audit --progress-spinner off
