@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import DockgeCoordinator
-from .devices import agent_display_name, stack_device_info
+from .devices import agent_device_id, agent_display_name, stack_device_info
 
 # action -> (entity name, icon); order is the order buttons are created in.
 BUTTONS: dict[str, tuple[str, str]] = {
@@ -71,6 +71,10 @@ class DockgeStackButton(CoordinatorEntity, ButtonEntity):
         self._attr_device_info = stack_device_info(
             entry.entry_id, self._endpoint, self._stack_name, agent_name,
             multi_agent=multi_agent,
+            via_device_id=agent_device_id(
+                coordinator.hass, entry, self._endpoint, agent_name,
+                multi_agent=multi_agent,
+            ),
         )
 
     async def async_press(self) -> None:

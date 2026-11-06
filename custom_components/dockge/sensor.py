@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import DockgeCoordinator
-from .devices import agent_device_info, agent_display_name, stack_device_info
+from .devices import agent_device_id, agent_device_info, agent_display_name, stack_device_info
 
 
 async def async_setup_entry(
@@ -109,6 +109,9 @@ class DockgeContainerSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_info = stack_device_info(
             entry.entry_id, endpoint, stack_name, agent_name,
             multi_agent=multi_agent,
+            via_device_id=agent_device_id(
+                coordinator.hass, entry, endpoint, agent_name, multi_agent=multi_agent
+            ),
         )
 
     def _get_service(self) -> dict | None:

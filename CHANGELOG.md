@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Stack devices now link to their Dockge server device by device id (`via_device_id`) instead of the deprecated `via_device` identifier, which Home Assistant 2026.8 deprecated and 2027.8 removes. Home Assistant versions before 2026.8 keep using `via_device`.
+
 ## [2.1.0] - 2026-09-25
 
 ### Added

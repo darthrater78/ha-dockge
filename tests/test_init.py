@@ -9,7 +9,7 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.dockge.const import DOMAIN
 
@@ -50,6 +50,26 @@ async def test_setup_creates_entities(hass: HomeAssistant, aioclient_mock) -> No
 
     for method, url, _data, headers in aioclient_mock.mock_calls:
         assert headers["X-API-Key"] == "secret", (method, url)
+
+
+async def test_stack_devices_link_to_agent_by_device_id(
+    hass: HomeAssistant, aioclient_mock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Stacks hang off their agent's device through via_device_id, not via_device."""
+    entry = await _setup(hass, aioclient_mock)
+    dev_reg = dr.async_get(hass)
+
+    for endpoint, stack in (("", "web"), ("gastly:5001", "db")):
+        agent = dev_reg.async_get_device_by_identifier(
+            (DOMAIN, f"{entry.entry_id}_{endpoint}"), entry.entry_id
+        )
+        stack_device = dev_reg.async_get_device_by_identifier(
+            (DOMAIN, f"{entry.entry_id}_{endpoint}_{stack}"), entry.entry_id
+        )
+        assert agent is not None and stack_device is not None
+        assert stack_device.via_device_id == agent.id
+
+    assert "deprecated `via_device` parameter" not in caplog.text
 
 
 async def test_button_press_calls_api(hass: HomeAssistant, aioclient_mock) -> None:
